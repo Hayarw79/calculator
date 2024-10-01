@@ -4,21 +4,43 @@
 # https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
 # test
 trigger:
-- master
+- main
 
-pool:
-  vmImage: ubuntu-latest
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '5.x'
+        installationPath: $(Agent.ToolsDirectory)/dotnet
+    - script: dotnet build --configuration Release
+      displayName: 'Build project'
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '20.x'
-  displayName: 'Install Node.js'
+- stage: Test
+  dependsOn: Build
+  jobs:
+  - job: TestJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: dotnet test --configuration Release
+      displayName: 'Run tests'
 
-- script: |
-    npm install
-    npm run build
-    npm test
-    displayName: 'npm install, build, and test'
-  
-
+- stage: Deploy
+  dependsOn: Test
+  jobs:
+  - deployment: DeployJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo Deploying to production
+            displayName: 'Deploy to production'
